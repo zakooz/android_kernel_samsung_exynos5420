@@ -1930,7 +1930,7 @@ struct platform_device exynos5_device_g3d = {
 		.coherent_dma_mask	= DMA_BIT_MASK(32),
 	},
 };
-#endif /* CONFIG_MALI_T6XX || CONFIG_MALI_MIDGARD_WK04 */
+#endif /* CONFIG_MALI_T6XX || CONFIG_MALI_MIDGARD_WK04 || CONFIG_MALI_T6XX_R7P0 */
 struct platform_device exynos4_device_g3d = {
 	.name	= "mali_dev",
 	.id		= 0,
