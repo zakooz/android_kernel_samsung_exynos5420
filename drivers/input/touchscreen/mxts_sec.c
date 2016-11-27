@@ -1538,7 +1538,7 @@ static void set_tk_threshold(void *device_data)
 #endif
 #endif
 
-#if defined(TSP_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
+#ifdef CONFIG_INPUT_BOOSTER
 static void boost_level(void *device_data)
 {
 	struct mxt_data *data = (struct mxt_data *)device_data;
@@ -1618,7 +1618,7 @@ static struct tsp_cmd tsp_cmds[] = {
 #if TSP_PATCH
 	{TSP_CMD("patch_update", patch_update),},
 #endif
-#if defined(TSP_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
+#ifdef CONFIG_INPUT_BOOSTER
 	{TSP_CMD("boost_level", boost_level),},
 #endif
 
@@ -2018,7 +2018,7 @@ static ssize_t touchkey_report_dummy_key_store(struct device *dev,
 	return size;
 }
 
-#if defined(TSP_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
+#ifdef CONFIG_INPUT_BOOSTER
 static ssize_t touchkey_boost_level(struct device *dev,
 						struct device_attribute *attr, const char *buf,
 						size_t count)
@@ -2077,7 +2077,7 @@ static DEVICE_ATTR(touchkey_threshold, S_IRUGO | S_IWUSR | S_IWGRP, get_touchkey
 static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP, NULL, touchkey_led_control);
 static DEVICE_ATTR(extra_button_event, S_IRUGO | S_IWUSR | S_IWGRP,
 					touchkey_report_dummy_key_show, touchkey_report_dummy_key_store);
-#if defined(TSP_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
+#ifdef CONFIG_INPUT_BOOSTER
 static DEVICE_ATTR(boost_level, S_IWUSR | S_IWGRP, NULL, touchkey_boost_level);
 #endif
 static DEVICE_ATTR(tsp_keys_enabled, S_IRUGO | S_IWUSR | S_IWGRP,
@@ -2097,7 +2097,7 @@ static struct attribute *touchkey_attributes[] = {
 	&dev_attr_touchkey_threshold.attr,
 	&dev_attr_brightness.attr,
 	&dev_attr_extra_button_event.attr,
-#if defined(TSP_BOOSTER) || defined(CONFIG_INPUT_BOOSTER)
+#ifdef CONFIG_INPUT_BOOSTER
 	&dev_attr_boost_level.attr,
 #endif
 	&dev_attr_tsp_keys_enabled.attr,

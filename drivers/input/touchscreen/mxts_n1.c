@@ -34,7 +34,8 @@ static bool tsp_keys_enabled = true;
 
 static int mxt_read_mem(struct mxt_data *data, u16 reg, u8 len, void *buf)
 {
-	int ret = 0, i = 0;
+	int ret = 0;
+	u32 i;
 	u16 le_reg = cpu_to_le16(reg);
 	struct i2c_msg msg[2] = {
 		{
@@ -214,7 +215,7 @@ static int mxt_calculate_infoblock_crc(struct mxt_data *data,
 	u32 crc = 0;
 	u8 mem[7 + data->info.object_num * 6];
 	int ret;
-	int i;
+	u32 i;
 
 	ret = mxt_read_mem(data, 0, sizeof(mem), mem);
 
@@ -278,7 +279,7 @@ static int mxt_read_config_crc(struct mxt_data *data, u32 *crc)
 
 static int mxt_check_instance(struct mxt_data *data, u8 type)
 {
-	int i;
+	u32 i;
 
 	for (i = 0; i < data->info.object_num; i++) {
 		if (data->objects[i].type == type)
@@ -565,14 +566,14 @@ static void inform_charger_init(struct mxt_data *data)
 
 static void mxt_report_input_data(struct mxt_data *data)
 {
-	int i;
-	int count = 0;
-	int report_count = 0;
-	bool booster_restart = false;
+	u32 i;
+	u32 count = 0;
+	u32 report_count = 0;
+	u8 booster_restart = false;
 	u16 sum_size = 0;
 	u16 touchMajor; /* 0309 */
 #if defined(CONFIG_N1A)
-	unsigned char size_offset = 25;
+	u8 size_offset = 25;
 #endif
 #if TSP_USE_SHAPETOUCH /* 0309 */
 	u16 touchMinor;
@@ -661,7 +662,7 @@ static void mxt_report_input_data(struct mxt_data *data)
 		report_count++;
 
 		if (data->fingers[i].state == MXT_STATE_PRESS) {
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if TSP_USE_ATMELDBG
 			tsp_debug_info(true, &data->client->dev, "[P][%d]: T[%d][%d] X[%d],Y[%d],W[%d],Z[%d],COMP[%d],SUM[%d],P[%d]\n",
 				i, data->fingers[i].type,
 				data->fingers[i].event,
@@ -684,10 +685,10 @@ static void mxt_report_input_data(struct mxt_data *data)
 #if TSP_BOOSTER
 			booster_restart = true;
 #endif
-#endif /*CONFIG_SAMSUNG_PRODUCT_SHIP*/
+#endif /*TSP_USE_ATMELDBG*/
 		}
 		else if (data->fingers[i].state == MXT_STATE_RELEASE) {
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if TSP_USE_ATMELDBG
 			tsp_debug_info(true, &data->client->dev, "[R][%d]: T[%d][%d] X[%d],Y[%d],W[%d],Z[%d],COMP[%d],SUM[%d],P[%d],M[%d]\n",
 				i, data->fingers[i].type,
 				data->fingers[i].event,
@@ -706,7 +707,7 @@ static void mxt_report_input_data(struct mxt_data *data)
 				0,0,0
 #endif /*TSP_USE_SHAPETOUCH*/
 			, data->fingers[i].mcount);
-#endif /*CONFIG_SAMSUNG_PRODUCT_SHIP*/
+#endif /*TSP_USE_ATMELDBG*/
 		}
 
 
@@ -745,8 +746,8 @@ static void mxt_report_input_data(struct mxt_data *data)
 
 static void mxt_release_all_finger(struct mxt_data *data)
 {
-	int i;
-	int count = 0;
+	u32 i;
+	u32 count = 0;
 
 	for (i = 0; i < MXT_MAX_FINGER; i++) {
 		if (data->fingers[i].state == MXT_STATE_INACTIVE)
@@ -904,7 +905,7 @@ static void mxt_treat_T15_object(struct mxt_data *data,
 
 	/* single key configuration*/
 	if (input_status) { /* press */
-		int i = 0, code = 0;
+		u32 i = 0, code = 0;
 		if (data->report_dummy_key) {
 			for (i = 0 ; i < tsp_keys_enabled && data->pdata->num_touchkey ; i++) {
 				if (change_state & data->pdata->touchkey[i].value) {
@@ -1088,7 +1089,7 @@ static void mxt_treat_T42_object(struct mxt_data *data,
 		struct mxt_message *message)
 {
 	tsp_debug_info(true, &data->client->dev, "%s\n", __func__);
-
+#if TSP_USE_ATMELDBG
 	if (message->message[0] & 0x01) {
 		/* Palm Press */
 		tsp_debug_info(true, &data->client->dev, "palm touch detected\n");
@@ -1096,6 +1097,7 @@ static void mxt_treat_T42_object(struct mxt_data *data,
 		/* Palm release */
 		tsp_debug_info(true, &data->client->dev, "palm touch released\n");
 	}
+#endif
 }
 
 static void mxt_treat_T57_object(struct mxt_data *data,
@@ -1562,7 +1564,7 @@ static int mxt_flash_fw(struct mxt_fw_info *fw_info)
 	size_t fw_size = fw_info->fw_len;
 	unsigned int frame_size;
 	unsigned int pos = 0;
-	int ret;
+	int ret = 0;
 
 	if (!fw_data) {
 		tsp_debug_err(true, dev, "firmware data is Null\n");
@@ -1574,7 +1576,7 @@ static int mxt_flash_fw(struct mxt_fw_info *fw_info)
 		/*may still be unlocked from previous update attempt */
 		ret = mxt_check_bootloader(client, MXT_WAITING_FRAME_DATA);
 		if (ret)
-			goto out;
+			return ret;
 	} else {
 		tsp_debug_info(true, dev, "Unlocking bootloader\n");
 		/* Unlock bootloader */
@@ -1585,7 +1587,7 @@ static int mxt_flash_fw(struct mxt_fw_info *fw_info)
 					MXT_WAITING_FRAME_DATA);
 		if (ret) {
 			tsp_debug_err(true, dev, "Fail updating firmware. wating_frame_data err\n");
-			goto out;
+			return ret;
 		}
 
 		frame_size = ((*(fw_data + pos) << 8) | *(fw_data + pos + 1));
@@ -1604,7 +1606,7 @@ static int mxt_flash_fw(struct mxt_fw_info *fw_info)
 						MXT_FRAME_CRC_PASS);
 		if (ret) {
 			tsp_debug_err(true, dev, "Fail updating firmware. frame_crc err\n");
-			goto out;
+			return ret;
 		}
 
 		pos += frame_size;
@@ -1618,12 +1620,12 @@ static int mxt_flash_fw(struct mxt_fw_info *fw_info)
 	ret = mxt_wait_for_chg(data, MXT_SW_RESET_TIME);
 	if (ret) {
 		tsp_debug_err(true, dev, "Not respond after F/W  finish reset\n");
-		goto out;
+		return ret;
 	}
 
 	tsp_debug_info(true, dev, "success updating firmware\n");
-out:
-	return ret;
+
+	return 0;
 }
 
 static void mxt_handle_T62_object(struct mxt_data *data)
@@ -1645,9 +1647,6 @@ static void mxt_handle_T62_object(struct mxt_data *data)
 	if (ret)
 		tsp_debug_err(true, &data->client->dev, "%s: failed to write T62 object.\n",
 				__func__);
-	else
-		tsp_debug_err(true, &data->client->dev, "%s: Setting T62 report disable.\n",
-				__func__);
 }
 static void mxt_handle_init_data(struct mxt_data *data)
 {
@@ -1661,8 +1660,6 @@ static void mxt_handle_init_data(struct mxt_data *data)
 
 /* disable T62 report bit. */
 	mxt_handle_T62_object(data);
-
-	return;
 }
 
 static int mxt_read_id_info(struct mxt_data *data)
@@ -1674,7 +1671,7 @@ static int mxt_read_id_info(struct mxt_data *data)
 	ret = mxt_read_mem(data, 0, MXT_INFOMATION_BLOCK_SIZE, id);
 	if (ret) {
 		tsp_debug_err(true, &data->client->dev, "Read fail. IC information\n");
-		goto out;
+		return ret;
 	} else {
 		tsp_debug_info(true, &data->client->dev,
 			"family: 0x%x variant: 0x%x version: 0x%x"
@@ -1689,15 +1686,13 @@ static int mxt_read_id_info(struct mxt_data *data)
 		data->info.matrix_ysize = id[5];
 		data->info.object_num = id[6];
 	}
-
-out:
-	return ret;
+	return 0;
 }
 
 static int mxt_get_object_table(struct mxt_data *data)
 {
 	int error;
-	int i;
+	u32 i;
 	u16 reg;
 	u8 reportid = 0;
 	u8 buf[MXT_OBJECT_TABLE_ELEMENT_SIZE];
@@ -1743,7 +1738,7 @@ static void mxt_make_reportid_table(struct mxt_data *data)
 {
 	struct mxt_object *objects = data->objects;
 	struct mxt_reportid *reportids = data->reportids;
-	int i, j;
+	u32 i, j;
 	int id = 0;
 
 	for (i = 0; i < data->info.object_num; i++) {
@@ -1776,22 +1771,20 @@ static int mxt_initialize(struct mxt_data *data)
 				GFP_KERNEL);
 	if (!data->objects) {
 		tsp_debug_err(true, &client->dev, "Failed to allocate memory\n");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	/* Get object table infomation */
 	ret = mxt_get_object_table(data);
 	if (ret)
-		goto out;
+		return ret;
 
 	data->reportids = kcalloc(data->max_reportid + 1,
 			sizeof(struct mxt_reportid),
 			GFP_KERNEL);
 	if (!data->reportids) {
 		tsp_debug_err(true, &client->dev, "Failed to allocate memory\n");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	/* Make report id table */
@@ -1800,22 +1793,18 @@ static int mxt_initialize(struct mxt_data *data)
 	/* Verify the info CRC */
 	ret = mxt_read_info_crc(data, &read_info_crc);
 	if (ret)
-		goto out;
+		return ret;
 
 	ret = mxt_calculate_infoblock_crc(data, &calc_info_crc);
 	if (ret)
-		goto out;
+		return ret;
 
 	if (read_info_crc != calc_info_crc) {
 		tsp_debug_err(true, &data->client->dev, "Infomation CRC error :[CRC 0x%06X!=0x%06X]\n",
 				read_info_crc, calc_info_crc);
-		ret = -EFAULT;
-		goto out;
+		return -EFAULT;
 	}
 	return 0;
-
-out:
-	return ret;
 }
 
 static int  mxt_rest_initialize(struct mxt_fw_info *fw_info)
@@ -1828,14 +1817,14 @@ static int  mxt_rest_initialize(struct mxt_fw_info *fw_info)
 	ret = mxt_command_backup(data, MXT_DISALEEVT_VALUE);
 	if (ret) {
 		tsp_debug_err(true, dev, "Failed Restore NV and stop event\n");
-		goto out;
+		return ret;
 	}
 
 	/* Write config */
 	ret = mxt_write_config(fw_info);
 	if (ret) {
 		tsp_debug_err(true, dev, "Failed to write config from file\n");
-		goto out;
+		return ret;
 	}
 
 	/* Handle data for init */
@@ -1845,7 +1834,7 @@ static int  mxt_rest_initialize(struct mxt_fw_info *fw_info)
 	ret = mxt_command_backup(data, MXT_BACKUP_VALUE);
 	if (ret) {
 		tsp_debug_err(true, dev, "Failed backup NV data\n");
-		goto out;
+		return ret;
 	}
 
 #if TSP_PATCH
@@ -1857,11 +1846,10 @@ static int  mxt_rest_initialize(struct mxt_fw_info *fw_info)
 	ret = mxt_command_reset(data, MXT_RESET_VALUE);
 	if (ret) {
 		tsp_debug_err(true, dev, "Failed Reset IC\n");
-		goto out;
+		return ret;
 	}
 
-out:
-	return ret;
+	return 0;
 }
 
 static int mxt_power_on(struct mxt_data *data)
@@ -1878,24 +1866,24 @@ static int mxt_power_on(struct mxt_data *data)
 
 	if (!data->pdata->power_on) {
 		dev_warn(&data->client->dev, "Power on function is not defined\n");
-		error = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	error = data->pdata->power_on();
 	if (error) {
 		tsp_debug_err(true, &data->client->dev, "Failed to power on\n");
-		goto out;
+		return error;
 	}
 
 	error = mxt_wait_for_chg(data, MXT_HW_RESET_TIME);
-	if (error)
+	if (error) {
 		tsp_debug_err(true, &data->client->dev, "Not respond after H/W reset\n");
+		return error;
+	}
 
 	data->mxt_enabled = true;
 
-out:
-	return error;
+	return 0;
 }
 
 static int mxt_power_off(struct mxt_data *data)
@@ -1907,20 +1895,18 @@ static int mxt_power_off(struct mxt_data *data)
 
 	if (!data->pdata->power_off) {
 		dev_warn(&data->client->dev, "Power off function is not defined\n");
-		error = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	error = data->pdata->power_off();
 	if (error) {
 		tsp_debug_err(true, &data->client->dev, "Failed to power off\n");
-		goto out;
+		return error;
 	}
 
 	data->mxt_enabled = false;
 
-out:
-	return error;
+	return 0;
 }
 
 /* Need to be called by function that is blocked with mutex */
@@ -1962,7 +1948,8 @@ static int mxt_stop(struct mxt_data *data)
 	error = mxt_power_off(data);
 	if (error) {
 		tsp_debug_err(true, &data->client->dev, "Fail to stop touch\n");
-		goto err_power_off;
+		enable_irq(data->client->irq);
+		return error;
 	}
 	mxt_release_all_finger(data);
 	
@@ -1977,10 +1964,6 @@ static int mxt_stop(struct mxt_data *data)
 	touchkey_set_dvfs_lock(data, TOUCHKEY_BOOSTER_FORCE_OFF);
 #endif
 	return 0;
-
-err_power_off:
-	enable_irq(data->client->irq);
-	return error;
 }
 
 static int mxt_input_open(struct input_dev *dev)
@@ -1994,19 +1977,17 @@ static int mxt_input_open(struct input_dev *dev)
 	if (ret < 0) {
 		tsp_debug_err(true, &data->client->dev,
 			"error while waiting for device to init (%d)\n", ret);
-		ret = -ENXIO;
-		goto err_open;
+		return -ENXIO;
 	}
 	if (ret == 0) {
 		tsp_debug_err(true, &data->client->dev,
 			"timedout while waiting for device to init\n");
-		ret = -ENXIO;
-		goto err_open;
+		return -ENXIO;
 	}
 
 	ret = mxt_start(data);
 	if (ret)
-		goto err_open;
+		return ret;
 
 #if defined(CONFIG_N1A_3G)
 	if (data->setdata == 1 && system_rev < 5) {
@@ -2016,13 +1997,11 @@ static int mxt_input_open(struct input_dev *dev)
 		}
 	}
 #endif
-
+#if TSP_USE_ATMELDBG
 	tsp_debug_info(true, &data->client->dev, "%s\n", __func__);
+#endif
 
 	return 0;
-
-err_open:
-	return ret;
 }
 
 static void mxt_input_close(struct input_dev *dev)
@@ -2030,8 +2009,9 @@ static void mxt_input_close(struct input_dev *dev)
 	struct mxt_data *data = input_get_drvdata(dev);
 
 	mxt_stop(data);
-
+#if TSP_USE_ATMELDBG
 	tsp_debug_info(true, &data->client->dev, "%s\n", __func__);
+#endif
 }
 
 static int mxt_make_highchg(struct mxt_data *data)
@@ -2066,13 +2046,13 @@ static int mxt_touch_finish_init(struct mxt_data *data)
 
 	if (error) {
 		tsp_debug_err(true, &client->dev, "Failed to register interrupt\n");
-		goto err_req_irq;
+		return error;
 	}
 
 	error = mxt_make_highchg(data);
 	if (error) {
 		tsp_debug_err(true, &client->dev, "Failed to clear CHG pin\n");
-		goto err_req_irq;
+		return error;
 	}
 
 	/*
@@ -2106,9 +2086,6 @@ static int mxt_touch_finish_init(struct mxt_data *data)
 	/* for blocking to be excuted open function untile finishing ts init */
 	complete_all(&data->init_done);
 	return 0;
-
-err_req_irq:
-	return error;
 }
 
 static int mxt_touch_rest_init(struct mxt_fw_info *fw_info)
@@ -2120,27 +2097,33 @@ static int mxt_touch_rest_init(struct mxt_fw_info *fw_info)
 	error = mxt_initialize(data);
 	if (error) {
 		tsp_debug_err(true, dev, "Failed to initialize\n");
-		goto err_free_mem;
+		kfree(data->objects);
+		data->objects = NULL;
+		kfree(data->reportids);
+		data->reportids = NULL;
+		return error;
 	}
 
 	error = mxt_rest_initialize(fw_info);
 	if (error) {
 		tsp_debug_err(true, dev, "Failed to rest initialize\n");
-		goto err_free_mem;
+		kfree(data->objects);
+		data->objects = NULL;
+		kfree(data->reportids);
+		data->reportids = NULL;
+		return error;
 	}
 
 	error = mxt_touch_finish_init(data);
-	if (error)
-		goto err_free_mem;
+	if (error) {
+		kfree(data->objects);
+		data->objects = NULL;
+		kfree(data->reportids);
+		data->reportids = NULL;
+		return error;
+	}
 
 	return 0;
-
-err_free_mem:
-	kfree(data->objects);
-	data->objects = NULL;
-	kfree(data->reportids);
-	data->reportids = NULL;
-	return error;
 }
 
 static int mxt_enter_bootloader(struct mxt_data *data)
@@ -2152,28 +2135,32 @@ static int mxt_enter_bootloader(struct mxt_data *data)
 				     sizeof(struct mxt_object),
 				     GFP_KERNEL);
 	if (!data->objects) {
-		tsp_debug_err(true, dev, "%s Failed to allocate memory\n",
+		tsp_debug_err(true, dev, "%s Failed to allocate memory.\n",
 			__func__);
-		error = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	/* Get object table information*/
 	error = mxt_get_object_table(data);
-	if (error)
-		goto err_free_mem;
+	if (error) {
+		tsp_debug_err(true, dev, "%s Failed to get object table.\n",
+			__func__);
+		kfree(data->objects);
+		data->objects = NULL;
+		return error;
+	}
 
 	/* Change to the bootloader mode */
 	error = mxt_command_reset(data, MXT_BOOT_VALUE);
-	if (error)
-		goto err_free_mem;
+	if (error) {
+		tsp_debug_err(true, dev, "%s Failed to change to the bootloader mode\n",
+			__func__);
+		kfree(data->objects);
+		data->objects = NULL;
+		return error;
+	}
 
-err_free_mem:
-	kfree(data->objects);
-	data->objects = NULL;
-
-out:
-	return error;
+	return 0;
 }
 
 static int mxt_flash_fw_on_probe(struct mxt_fw_info *fw_info)
@@ -2189,18 +2176,23 @@ static int mxt_flash_fw_on_probe(struct mxt_fw_info *fw_info)
 		error = mxt_probe_bootloader(data->client_boot);
 		if (error) {
 			tsp_debug_err(true, dev, "Failed to verify bootloader's status\n");
-			goto out;
+			return error;
 		}
 
 		tsp_debug_info(true, dev, "Updating firmware from boot-mode\n");
-		goto load_fw;
+		error = mxt_flash_fw(fw_info);
+		if (error)
+			tsp_debug_err(true, dev, "Failed updating firmware\n");
+		else
+			tsp_debug_info(true, dev, "succeeded updating firmware\n");
+		return error;
 	}
 
 	/* compare the version to verify necessity of firmware updating */
 	if (data->info.version == fw_info->fw_ver
 			&& data->info.build == fw_info->build_ver) {
 		tsp_debug_dbg(false, dev, "Firmware version is same with in IC\n");
-		goto out;
+		return error;
 	}
 
 	tsp_debug_info(true, dev, "Updating firmware from app-mode : IC:0x%x,0x%x =! FW:0x%x,0x%x\n",
@@ -2210,17 +2202,10 @@ static int mxt_flash_fw_on_probe(struct mxt_fw_info *fw_info)
 	error = mxt_enter_bootloader(data);
 	if (error) {
 		tsp_debug_err(true, dev, "Failed updating firmware\n");
-		goto out;
+		return error;
 	}
 
-load_fw:
-	error = mxt_flash_fw(fw_info);
-	if (error)
-		tsp_debug_err(true, dev, "Failed updating firmware\n");
-	else
-		tsp_debug_info(true, dev, "succeeded updating firmware\n");
-out:
-	return error;
+	return 0;
 }
 
 static void mxt_request_firmware_work(const struct firmware *fw,
@@ -2234,22 +2219,32 @@ static void mxt_request_firmware_work(const struct firmware *fw,
 	fw_info.data = data;
 
 	error = mxt_verify_fw(&fw_info, fw);
-	if (error)
-		goto ts_rest_init;
+	if (error) {
+		error = mxt_touch_rest_init(&fw_info);
+		if (error) /* complete anyway, so open() doesn't get blocked */
+			complete_all(&data->init_done);
+		release_firmware(fw);
+		return;
+	}
 
 	/* Skip update on boot up if firmware file does not have a header */
-	if (!fw_info.hdr_len)
-		goto ts_rest_init;
+	if (!fw_info.hdr_len) {
+		error = mxt_touch_rest_init(&fw_info);
+		if (error) /* complete anyway, so open() doesn't get blocked */
+			complete_all(&data->init_done);
+		release_firmware(fw);
+		return;
+	}
 
 	error = mxt_flash_fw_on_probe(&fw_info);
-	if (error)
-		goto out;
-
-ts_rest_init:
-	error = mxt_touch_rest_init(&fw_info);
-out:
-	if (error)
+	if (error) {
 		/* complete anyway, so open() doesn't get blocked */
+		complete_all(&data->init_done);
+		release_firmware(fw);
+	}
+
+	error = mxt_touch_rest_init(&fw_info);
+	if (error)
 		complete_all(&data->init_done);
 
 	release_firmware(fw);
@@ -2287,7 +2282,7 @@ static int __devinit mxt_touch_init(struct mxt_data *data, bool nowait)
 		if (ret) {
 			tsp_debug_err(true, &client->dev,
 				"error requesting built-in firmware\n");
-			goto out;
+			return ret;
 		}
 		mxt_request_firmware_work(fw, data);
 	} else {
@@ -2298,8 +2293,6 @@ static int __devinit mxt_touch_init(struct mxt_data *data, bool nowait)
 			tsp_debug_err(true, &client->dev,
 				"cannot schedule firmware update (%d)\n", ret);
 	}
-
-out:
 	return ret;
 }
 
@@ -2403,9 +2396,9 @@ static int __devinit mxt_probe(struct i2c_client *client,
 
 	input_dev = input_allocate_device();
 	if (!input_dev) {
-		error = -ENOMEM;
 		tsp_debug_err(true, &client->dev, "Input device allocation failed\n");
-		goto err_allocate_input_device;
+		kfree(data);
+		return -ENOMEM;
 	}
 
 	input_dev->name = "sec_touchscreen";
@@ -2471,31 +2464,52 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	if (!data->client_boot) {
 		tsp_debug_err(true, &client->dev, "Fail to register sub client[0x%x]\n",
 			 boot_address);
-		error = -ENODEV;
-		goto err_create_sub_client;
+		input_free_device(input_dev);
+		err_allocate_input_device:
+		kfree(data);
+		return -ENODEV;
 	}
 
 	/* regist input device */
 	error = input_register_device(input_dev);
-	if (error)
-		goto err_register_input_device;
+	if (error) {
+		tsp_debug_err(true, &client->dev, "Failed to register device\n");
+		i2c_unregister_device(data->client_boot);
+		input_free_device(input_dev);
+		kfree(data);
+	}
 
 	error = mxt_sysfs_init(client);
 	if (error < 0) {
 		tsp_debug_err(true, &client->dev, "Failed to create sysfs\n");
-		goto err_sysfs_init;
+		input_unregister_device(input_dev);
+		input_dev = NULL;
+		i2c_unregister_device(data->client_boot);
+		input_free_device(input_dev);
+		kfree(data);
 	}
 
 	error = mxt_power_on(data);
 	if (error) {
 		tsp_debug_err(true, &client->dev, "Failed to power_on\n");
-		goto err_power_on;
+		mxt_sysfs_remove(data);
+		input_unregister_device(input_dev);
+		input_dev = NULL;
+		i2c_unregister_device(data->client_boot);
+		input_free_device(input_dev);
+		kfree(data);
 	}
 
 	error = mxt_touch_init(data, MXT_FIRMWARE_UPDATE_TYPE);
 	if (error) {
 		tsp_debug_err(true, &client->dev, "Failed to init driver\n");
-		goto err_touch_init;
+		mxt_power_off(data);
+		mxt_sysfs_remove(data);
+		input_unregister_device(input_dev);
+		input_dev = NULL;
+		i2c_unregister_device(data->client_boot);
+		input_free_device(input_dev);
+		kfree(data);
 	}
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -2506,22 +2520,6 @@ static int __devinit mxt_probe(struct i2c_client *client,
 #endif
 
 	return 0;
-
-err_touch_init:
-	mxt_power_off(data);
-err_power_on:
-	mxt_sysfs_remove(data);
-err_sysfs_init:
-	input_unregister_device(input_dev);
-	input_dev = NULL;
-err_register_input_device:
-	i2c_unregister_device(data->client_boot);
-err_create_sub_client:
-	input_free_device(input_dev);
-err_allocate_input_device:
-	kfree(data);
-
-	return error;
 }
 
 static int __devexit mxt_remove(struct i2c_client *client)

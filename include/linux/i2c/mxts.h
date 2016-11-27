@@ -311,7 +311,7 @@ enum {
 
 /************** Feature + **************/
 #if defined(CONFIG_V1A) || defined(CONFIG_V2A) || defined(CONFIG_CHAGALL) || defined (CONFIG_N2A)
-#ifdef CONFIG_INPUT_BOOSTER
+#ifndef CONFIG_INPUT_BOOSTER
 #define TSP_BOOSTER				0
 #define TOUCHKEY_BOOSTER		0
 #else
@@ -328,12 +328,17 @@ enum {
 #define TSP_CHANGE_CONFIG_FOR_INPUT    1
 #define USE_FOR_SUFACE			1
 #elif defined(CONFIG_N1A)
+#ifndef CONFIG_INPUT_BOOSTER
+#define TSP_BOOSTER			0
+#define TOUCHKEY_BOOSTER		0
+#else
 #define TSP_BOOSTER			1
+#define TOUCHKEY_BOOSTER		1
+#endif
 #define TSP_SEC_FACTORY			1
 #define TSP_INFORM_CHARGER		1
 #define TSP_USE_SHAPETOUCH		1
 #define ENABLE_TOUCH_KEY		1
-#define TOUCHKEY_BOOSTER		1
 #define TSP_CHECK_ATCH			1
 #define TSP_PATCH			1
 #ifdef CONFIG_SEC_FACTORY
